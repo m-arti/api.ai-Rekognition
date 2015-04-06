@@ -4,7 +4,6 @@ Button["CLICK TO IDENTIFY",
   REC = SystemDialogInput["RecordSound"];
   
   (*timestamps*)
-  
   time[] := 
    DateString[{"Hour12Short", ":", "Minute", ":", "Second", " ", 
      "AMPMLowerCase"}];
@@ -12,7 +11,6 @@ Button["CLICK TO IDENTIFY",
   
   If[
     (*condition 1:voice recording cancelled or aborted*)
-    
     REC === $Canceled || REC === $Aborted,
     (*if true*)
     (Print[
@@ -60,10 +58,10 @@ Button["CLICK TO IDENTIFY",
       action from api.ai recognised*)(APIsuccess == "success" && 
         APIinit =!= StringTake["", 23] && 
         APIinit == "Recognition successful."),
+     
       (*if true*)
       (
        (*open camera, take photo and close camera*)
-       
        tINIT = time[]; tIN = 1;
        Print[
         Panel[Row[{tINIT, "\t", "PC: ", 
@@ -78,7 +76,6 @@ Button["CLICK TO IDENTIFY",
        IMAQ`StopCamera[];
        
        (*convert photo to Base 64*)
-       
        base64 = ExportString[ExportString[img, "JPEG"], "Base64"];
        
        (*send Rekognition request*)
@@ -86,16 +83,13 @@ Button["CLICK TO IDENTIFY",
           "http://rekognition.com/func/api/?", {"api_key" -> 
             "*your api key*", "api_secret" -> "*your api secret*", 
            "jobs" -> 
-            "face_aggressive_part_part_detail_emotion_glass_mouth_\
-open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64}, 
+            "face_aggressive_part_part_detail_emotion_glass_mouth_open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64}, 
           "JSON", "Method" -> "POST"] /. Rule -> List;
        
        (*no.of people detected in photo*)
-       
        num = Length[R[[3, 2]]];
        
        (*untransformed rectangles*)
-       
        boxes = Table[({sizew, sizeh} = 
            R[[3, 2, person, 12, 2, 2, 2, #, 2]] & /@ {1, 2};
           {w, h} = R[[1, 2, #, 2]] & /@ {1, 2};
@@ -132,7 +126,6 @@ open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64},
           Range[num]}];
        
        (*facial feautures*)
-       
        smile = Val[34, "not smiling", "smiling"];
        glasses = Val[35, "no glasses", "glasses"];
        sunglasses = Val[36, "no sunglasses", "sunglasses"];
@@ -148,7 +141,6 @@ open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64},
              Alignment -> Left]}), {person, Range[num]}];
        
        (*user attributes*)
-       
        age = Table[R[[3, 2, person, 33]], {person, Range[num]}];
        age = Row[{#[[2]], " years"}] & /@ age;
        gender = Val[39, "female", "male"];
@@ -165,7 +157,6 @@ open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64},
           Range[num]}];
        
        (*transformed polygons*)
-       
        polygon = Polygon[{{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}}];
        face3d = 
         Table[Pane[
@@ -183,8 +174,7 @@ open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64},
              h - R[[3, 2, #, 12, 2, 2, 2, 2, 2]]/2. - 
               R[[3, 2, #, 12, 2, 1, 2, 2, 2]]}]} & /@ Range[num];
        
-       (*display conversation& results on interface*)
-       
+       (*display conversation & results on interface*)
        tOUTPUT = time[]; tIN = 2;
        IDoutput = 
         Panel[Grid[{{DynamicModule[{x, y}, 
@@ -227,7 +217,6 @@ open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64},
        
        If[
         (*no face detected*)
-        
         num == 0, (Print[
           Panel[Row[{tOUTPUT, "\t", 
              "PC: Recognition unsuccessful. Please try again."}]]];
@@ -251,21 +240,21 @@ open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64},
                    LetterCharacter ..])], 
              APIinitfull <> " Person " <> RES <> ", is"], " "], 
            "."]];
+        
         If[
          (*command understood& at least 1 face detected*)
-         
          num >= 1 && 
-          
           APIparam == "verb", (Print[
            Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinit}]]]; 
           Print[IDoutput]; Speak[APIinit]),
+         
          If[
           (*command contains a pronoun*)
-          
           num >= 1 && 
            APIparam == "pronoun", (Print[
             Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinitfull}]]]; 
            Print[IDoutput]; Speak[APIinitfull]),
+          
           If[
            (*command contains an adjective*)
            num >= 1 && (APIparam == "adjective (comparative)" || 
