@@ -1,0 +1,292 @@
+Button["CLICK TO IDENTIFY",
+ (
+  (*record voice command*)
+  REC = SystemDialogInput["RecordSound"];
+  
+  (*timestamps*)
+  
+  time[] := 
+   DateString[{"Hour12Short", ":", "Minute", ":", "Second", " ", 
+     "AMPMLowerCase"}];
+  tREC = time[];
+  
+  If[
+    (*condition 1:voice recording cancelled or aborted*)
+    
+    REC === $Canceled || REC === $Aborted,
+    (*if true*)
+    (Print[
+      Panel[Row[{tREC, "\t", "PC: ", 
+         "You have cancelled recognition."}]]]; 
+     Speak["You have cancelled recognition."]),(*if false*)
+    
+    (
+     (*record command and save as.wav file*)
+     SPEECHinput[recording_Sound] := 
+      Sound[SampledSoundList[Downsample[recording[[1, 1]], 3], 16000]];
+     Export["speech.wav", SPEECHinput[REC]];
+     
+     (*convert.wav file data to binary*)
+     binarydata = 
+      ImportString[ExportString[Import["speech.wav"], "WAV"], 
+       "Binary"];
+     
+     (*send api.ai request*)
+     A = URLFetch["https://api.api.ai/v1/query", "Method" -> "POST", 
+       "Headers" -> {"Authorization" -> 
+          "Bearer *your client access token*", 
+         "ocp-apim-subscription-key" -> "*your subscription key*"}, 
+       "MultipartData" -> {{"request", "application/json", 
+          ToCharacterCode["{'lang':'en','timezone':'GMT'}", 
+           "UTF8"]}, {"voiceData", "audio/wav", binarydata}}];
+     SPEECHtoTEXT = 
+      StringSplit[StringSplit[A, ","][[3]], ": "][[-1]] /. {"400" -> 
+         " . . . ", ":" -> "API request failed. Please try again."};
+     APIsuccess = 
+      StringSplit[StringCases[A, "errorType" ~~ __], "\""][[1, 3]];
+     APIinit = 
+      StringTake[
+       StringSplit[StringCases[A, "speech" ~~ __], "\""][[1, 3]], 
+       23];
+     APIinitfull = 
+      StringDrop[
+       StringReplace[
+        StringSplit[StringCases[A, "speech" ~~ __], "\""][[1, 
+          3]], {"\\u0027" -> "'"}], 24];
+     Print[Panel[Row[{tREC, "\t", "You: ", SPEECHtoTEXT}]]];
+     
+     If[
+      (*condition 2:'correct' command spoken/
+      action from api.ai recognised*)(APIsuccess == "success" && 
+        APIinit =!= StringTake["", 23] && 
+        APIinit == "Recognition successful."),
+      (*if true*)
+      (
+       (*open camera, take photo and close camera*)
+       
+       tINIT = time[]; tIN = 1;
+       Print[
+        Panel[Row[{tINIT, "\t", "PC: ", 
+           "Initialising recognition engine. Please wait.", 
+           Dynamic[
+            If[tIN == 1, ProgressIndicator[Appearance -> "Percolate"],
+              ""]]}]]];
+       Speak["Initialising recognition engine. Please wait."];
+       Clear[img];
+       IMAQ`StartCamera[]; Pause[0.5];
+       img = CurrentImage[];
+       IMAQ`StopCamera[];
+       
+       (*convert photo to Base 64*)
+       
+       base64 = ExportString[ExportString[img, "JPEG"], "Base64"];
+       
+       (*send Rekognition request*)
+       R = URLExecute[
+          "http://rekognition.com/func/api/?", {"api_key" -> 
+            "*your api key*", "api_secret" -> "*your api secret*", 
+           "jobs" -> 
+            "face_aggressive_part_part_detail_emotion_glass_mouth_\
+open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64}, 
+          "JSON", "Method" -> "POST"] /. Rule -> List;
+       
+       (*no.of people detected in photo*)
+       
+       num = Length[R[[3, 2]]];
+       
+       (*untransformed rectangles*)
+       
+       boxes = Table[({sizew, sizeh} = 
+           R[[3, 2, person, 12, 2, 2, 2, #, 2]] & /@ {1, 2};
+          {w, h} = R[[1, 2, #, 2]] & /@ {1, 2};
+          {x, y} = R[[3, 2, person, 12, 2, 1, 2, #, 2]] & /@ {1, 2};
+          box = {{{x, h - y}, {x + sizew, h - y - sizew}}}), {person, 
+          Range[num]}];
+       facessizes = 
+        R[[3, 2, #, 12, 2, 2, 2, 1 ;; 2, 2]] & /@ Range[num];
+       pose = 
+        Table[(R[[3, 2, person, 16, 2, #, 2]] & /@ {1, 2, 
+            3}), {person, Range[num]}];
+       
+       (*orientation of faces*)
+       {roll, pitch, yaw} = 
+        Table[(pose[[#, i]] & /@ Range[num]), {i, Range[3]}];
+       
+       (*all points on face(s)*)
+       allpoints = 
+        Table[({elu, bll, mouthr, erl, err, eld, blm, nose, mouthl, 
+            eyeright, eyeleft, blr, brl, erd, brm, nl, brr, eru, ell, 
+            elr, nr, mu, md} = 
+           Table[(R[[3, 2, person, i, 2, #, 2]] & /@ {1, 2}), {i, 
+             Catenate@{Range[1, 2], Range[4, 11], {13}, 
+               Range[17, 28]}}]), {person, Range[num]}];
+       points = 
+        Table[Table[{i[[1]], h - i[[2]]}, {i, 
+           allpoints[[person]]}], {person, Range[num]}];
+       Val[part_Integer, valneg_String, valpos_String] := 
+        Table[(prop = R[[3, 2, person, part]];
+          
+          If[prop[[2]] < 0.5, 
+           valneg <> " (" <> ToString@prop[[2]] <> ")", 
+           valpos <> " (" <> ToString@prop[[2]] <> ")"]), {person, 
+          Range[num]}];
+       
+       (*facial feautures*)
+       
+       smile = Val[34, "not smiling", "smiling"];
+       glasses = Val[35, "no glasses", "glasses"];
+       sunglasses = Val[36, "no sunglasses", "sunglasses"];
+       eyesclosed = Val[29, "eyes open", "eyes closed"];
+       mouthopenwide = 
+        Val[37, "mouth not wide open", "mouth wide open"];
+       beauty = 
+        Table[Row[Riffle[R[[3, 2, person, 38]], " : "]], {person, 
+          Range[num]}];
+       emotion = 
+        Table[(Column@{"emotion:\n", 
+            Grid[R[[3, 2, person, 32, 2]], 
+             Alignment -> Left]}), {person, Range[num]}];
+       
+       (*user attributes*)
+       
+       age = Table[R[[3, 2, person, 33]], {person, Range[num]}];
+       age = Row[{#[[2]], " years"}] & /@ age;
+       gender = Val[39, "female", "male"];
+       race = Table[R[[3, 2, person, 30]], {person, Range[num]}];
+       race = Row[{#[[2, 1, 1]], " (", #[[2, 1, 2]], ")"}] & /@ race;
+       
+       (*transformations*)
+       rad[x_] := (Pi*x)/180.;
+       transformation = 
+        Table[Composition[
+          RotationTransform[rad[roll[[person]]], {1, 0, 0}], 
+          RotationTransform[rad[pitch[[person]]], {0, 1, 0}], 
+          RotationTransform[rad[yaw[[person]]], {0, 0, 1}]], {person, 
+          Range[num]}];
+       
+       (*transformed polygons*)
+       
+       polygon = Polygon[{{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}}];
+       face3d = 
+        Table[Pane[
+          Graphics3D[{GeometricTransformation[{EdgeForm[{Orange, 
+                Thickness[0.001]}], Orange, Opacity[0.15], polygon}, 
+             transformation[[person]]]}, ViewPoint -> Front, 
+           SphericalRegion -> True, Boxed -> False, 
+           ImageSize -> facessizes[[person]]*1.35, 
+           Method -> {"ShrinkWrap" -> True}]], {person, Range[num]}];
+       
+       (*position polygon(s)*)
+       insetpolygon[] := {Inset[
+            face3d[[#]], {R[[3, 2, #, 12, 2, 1, 2, 1, 2]] + 
+              R[[3, 2, #, 12, 2, 2, 2, 2, 2]]/2., 
+             h - R[[3, 2, #, 12, 2, 2, 2, 2, 2]]/2. - 
+              R[[3, 2, #, 12, 2, 1, 2, 2, 2]]}]} & /@ Range[num];
+       
+       (*display conversation& results on interface*)
+       
+       tOUTPUT = time[]; tIN = 2;
+       IDoutput = 
+        Panel[Grid[{{DynamicModule[{x, y}, 
+             Column[{Row[{CheckboxBar[
+                  Dynamic[
+                   x], {{Orange, PointSize[0.008], Opacity[1], 
+                    Point[points[[#]]] & /@ Range[num]} -> "Points", 
+                   Delimiter, {Inset[
+                    Style[#, 20, White, Opacity[1], 
+                    FontFamily -> 
+                    "Helvetica Neue"], {boxes[[#, 1, 1, 1]], 
+                    boxes[[#, 1, 1, 2]]} - 8.] & /@ Range[num]} -> 
+                    "Number"}], "\t", 
+                 Row[{"Box: ", 
+                   Toggler[
+                    Dynamic[
+                    y], {{EdgeForm[{Orange, Thickness[0.001]}], 
+                    Opacity[0], Rectangle @@@ boxes[[;; , 1]]} -> 
+                    Framed@"Untransformed", {insetpolygon[]} -> 
+                    Framed@"Transformed", {} -> Framed@"None"}]}]}], 
+               Pane[Dynamic[HighlightImage[img, Graphics[{x, y}]]], 
+                Alignment -> Center, ImageMargins -> 10]}, 
+              Alignment -> Center, Dividers -> Center, 
+              FrameStyle -> GrayLevel[0.8]]], 
+            Style[Grid[{Column[{Row@
+                    Riffle[{"Person " <> ToString@#}, "\t"], 
+                   Row[Riffle[{age[[#]], gender[[#]], race[[#]]}, 
+                    " | "]], Row[{smile[[#]], " | ", beauty[[#]]}], 
+                   emotion[[#]], 
+                   Row[{glasses[[#]], " / ", sunglasses[[#]]}], 
+                   eyesclosed[[#]], mouthopenwide[[#]]}, 
+                  Spacings -> 2, Dividers -> Center, 
+                  FrameStyle -> GrayLevel[0.8]] & /@ Range[num]}, 
+              Spacings -> 3, Dividers -> Center, 
+              FrameStyle -> GrayLevel[0.9]], 
+             FontFamily -> "Helvetica Neue"]}}, 
+          Dividers -> {{False, True, False}, None}, 
+          Spacings -> {5, 1}, FrameStyle -> GrayLevel[0.8]], 
+         Alignment -> {Center, Center}];
+       
+       If[
+        (*no face detected*)
+        
+        num == 0, (Print[
+          Panel[Row[{tOUTPUT, "\t", 
+             "PC: Recognition unsuccessful. Please try again."}]]];
+         Speak["Recognition unsuccessful. Please try again."]), 
+        APIparam = 
+         StringSplit[StringCases[A, "parameters" ~~ __], "\""][[1, 5]];
+        RES = 
+         ToString[
+          Extract[Position[#, Max[#]] &[beauty[[;; , 1, 3]]], {1, 1}]];
+        RESspeech = 
+         StringJoin[
+          Append[Riffle[
+            Prepend[
+             Reverse[
+              StringCases[SPEECHtoTEXT, 
+                WordCharacter ..] \[Intersection] ({"the", "more", 
+                  "most", "of", "all"} \[Union] 
+                 StringCases[
+                  SPEECHtoTEXT, ("cut" | "beau" | "hand" | "gorg" | 
+                    "fine" | "bet" | "goo" | "look") ~~ 
+                   LetterCharacter ..])], 
+             APIinitfull <> " Person " <> RES <> ", is"], " "], 
+           "."]];
+        If[
+         (*command understood& at least 1 face detected*)
+         
+         num >= 1 && 
+          
+          APIparam == "verb", (Print[
+           Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinit}]]]; 
+          Print[IDoutput]; Speak[APIinit]),
+         If[
+          (*command contains a pronoun*)
+          
+          num >= 1 && 
+           APIparam == "pronoun", (Print[
+            Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinitfull}]]]; 
+           Print[IDoutput]; Speak[APIinitfull]),
+          If[
+           (*command contains an adjective*)
+           num >= 1 && (APIparam == "adjective (comparative)" || 
+              APIparam == "adjective (superlative)"), (Print[
+             Panel[Row[{tOUTPUT, "\t", "PC: ", RESspeech}]]]; 
+            Print[IDoutput]; 
+            Speak[RESspeech]), (Print[
+             Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinit}]]]; 
+            Speak[APIinit])]]]]),
+      
+      (*if false*)
+      (
+       tFAIL = time[];
+       Print[
+        Panel[Row[{tFAIL, "\t", 
+           "PC: Sorry, I couldn't understand your command. Please try again."}]]];
+       Pause[1.];
+       Speak[
+        "Sorry, I couldn't understand your command. Please try again."]
+       )
+      ]
+     )
+    ] // Quiet
+  ), Method -> "Queued"]
