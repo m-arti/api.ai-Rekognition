@@ -38,7 +38,7 @@ Button["CLICK TO IDENTIFY",
           ToCharacterCode["{'lang':'en','timezone':'GMT'}", 
            "UTF8"]}, {"voiceData", "audio/wav", binarydata}}];
      SPEECHtoTEXT = 
-      StringSplit[StringSplit[A, ","][[3]], ": "][[-1]] /. {"400" -> 
+      StringSplit[StringSplit[A, ","][[4]], ": "][[-1]] /. {"400" -> 
          " . . . ", ":" -> "API request failed. Please try again."};
      APIsuccess = 
       StringSplit[StringCases[A, "errorType" ~~ __], "\""][[1, 3]];
