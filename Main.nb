@@ -1,35 +1,36 @@
 Button["CLICK TO IDENTIFY",
  (
-  (*record voice command*)
+  (* record voice command *)
   REC = SystemDialogInput["RecordSound"];
   
-  (*timestamps*)
+  (* timestamps *)
   time[] := 
    DateString[{"Hour12Short", ":", "Minute", ":", "Second", " ", 
      "AMPMLowerCase"}];
   tREC = time[];
   
   If[
-    (*condition 1:voice recording cancelled or aborted*)
+    (* condition 1:voice recording cancelled or aborted *)
     REC === $Canceled || REC === $Aborted,
-    (*if true*)
+    (* if true *)
     (Print[
       Panel[Row[{tREC, "\t", "PC: ", 
          "You have cancelled recognition."}]]]; 
-     Speak["You have cancelled recognition."]),(*if false*)
-    
+     Speak["You have cancelled recognition."]),
+     
+     (* if false *)
     (
-     (*record command and save as.wav file*)
+     (* record command and save as.wav file *)
      SPEECHinput[recording_Sound] := 
       Sound[SampledSoundList[Downsample[recording[[1, 1]], 3], 16000]];
      Export["speech.wav", SPEECHinput[REC]];
      
-     (*convert.wav file data to binary*)
+     (* convert.wav file data to binary *)
      binarydata = 
       ImportString[ExportString[Import["speech.wav"], "WAV"], 
        "Binary"];
      
-     (*send api.ai request*)
+     (* send api.ai request *)
      A = URLFetch["https://api.api.ai/v1/query", "Method" -> "POST", 
        "Headers" -> {"Authorization" -> 
           "Bearer *your client access token*", 
@@ -54,14 +55,15 @@ Button["CLICK TO IDENTIFY",
      Print[Panel[Row[{tREC, "\t", "You: ", SPEECHtoTEXT}]]];
      
      If[
-      (*condition 2:'correct' command spoken/
-      action from api.ai recognised*)(APIsuccess == "success" && 
+     
+      (* condition 2:'correct' command spoken & action from api.ai validated *)
+        (APIsuccess == "success" && 
         APIinit =!= StringTake["", 23] && 
         APIinit == "Recognition successful."),
      
-      (*if true*)
+      (* if true *)
       (
-       (*open camera, take photo and close camera*)
+       (* turn on camera, take photo and close camera *)
        tINIT = time[]; tIN = 1;
        Print[
         Panel[Row[{tINIT, "\t", "PC: ", 
@@ -75,10 +77,10 @@ Button["CLICK TO IDENTIFY",
        img = CurrentImage[];
        IMAQ`StopCamera[];
        
-       (*convert photo to Base 64*)
+       (* convert photo to Base 64 *)
        base64 = ExportString[ExportString[img, "JPEG"], "Base64"];
        
-       (*send Rekognition request*)
+       (* send Rekognition request *)
        R = URLExecute[
           "http://rekognition.com/func/api/?", {"api_key" -> 
             "*your api key*", "api_secret" -> "*your api secret*", 
@@ -86,10 +88,10 @@ Button["CLICK TO IDENTIFY",
             "face_aggressive_part_part_detail_emotion_glass_mouth_open_wide_eye_closed_beauty_race_gender_age", "base64" -> base64}, 
           "JSON", "Method" -> "POST"] /. Rule -> List;
        
-       (*no.of people detected in photo*)
+       (* no. of people detected in photo *)
        num = Length[R[[3, 2]]];
        
-       (*untransformed rectangles*)
+       (* untransformed rectangles *)
        boxes = Table[({sizew, sizeh} = 
            R[[3, 2, person, 12, 2, 2, 2, #, 2]] & /@ {1, 2};
           {w, h} = R[[1, 2, #, 2]] & /@ {1, 2};
@@ -102,11 +104,11 @@ Button["CLICK TO IDENTIFY",
         Table[(R[[3, 2, person, 16, 2, #, 2]] & /@ {1, 2, 
             3}), {person, Range[num]}];
        
-       (*orientation of faces*)
+       (* orientation of faces *)
        {roll, pitch, yaw} = 
         Table[(pose[[#, i]] & /@ Range[num]), {i, Range[3]}];
        
-       (*all points on face(s)*)
+       (* all points on face(s) *)
        allpoints = 
         Table[({elu, bll, mouthr, erl, err, eld, blm, nose, mouthl, 
             eyeright, eyeleft, blr, brl, erd, brm, nl, brr, eru, ell, 
@@ -125,7 +127,7 @@ Button["CLICK TO IDENTIFY",
            valpos <> " (" <> ToString@prop[[2]] <> ")"]), {person, 
           Range[num]}];
        
-       (*facial feautures*)
+       (* facial feautures *)
        smile = Val[34, "not smiling", "smiling"];
        glasses = Val[35, "no glasses", "glasses"];
        sunglasses = Val[36, "no sunglasses", "sunglasses"];
@@ -140,14 +142,14 @@ Button["CLICK TO IDENTIFY",
             Grid[R[[3, 2, person, 32, 2]], 
              Alignment -> Left]}), {person, Range[num]}];
        
-       (*user attributes*)
+       (* user attributes *)
        age = Table[R[[3, 2, person, 33]], {person, Range[num]}];
        age = Row[{#[[2]], " years"}] & /@ age;
        gender = Val[39, "female", "male"];
        race = Table[R[[3, 2, person, 30]], {person, Range[num]}];
        race = Row[{#[[2, 1, 1]], " (", #[[2, 1, 2]], ")"}] & /@ race;
        
-       (*transformations*)
+       (* transformations *)
        rad[x_] := (Pi*x)/180.;
        transformation = 
         Table[Composition[
@@ -156,7 +158,7 @@ Button["CLICK TO IDENTIFY",
           RotationTransform[rad[yaw[[person]]], {0, 0, 1}]], {person, 
           Range[num]}];
        
-       (*transformed polygons*)
+       (* transformed polygons *)
        polygon = Polygon[{{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}}];
        face3d = 
         Table[Pane[
@@ -167,14 +169,14 @@ Button["CLICK TO IDENTIFY",
            ImageSize -> facessizes[[person]]*1.35, 
            Method -> {"ShrinkWrap" -> True}]], {person, Range[num]}];
        
-       (*position polygon(s)*)
+       (* position polygon(s) *)
        insetpolygon[] := {Inset[
             face3d[[#]], {R[[3, 2, #, 12, 2, 1, 2, 1, 2]] + 
               R[[3, 2, #, 12, 2, 2, 2, 2, 2]]/2., 
              h - R[[3, 2, #, 12, 2, 2, 2, 2, 2]]/2. - 
               R[[3, 2, #, 12, 2, 1, 2, 2, 2]]}]} & /@ Range[num];
        
-       (*display conversation & results on interface*)
+       (* display conversation & results on interface *)
        tOUTPUT = time[]; tIN = 2;
        IDoutput = 
         Panel[Grid[{{DynamicModule[{x, y}, 
@@ -216,7 +218,7 @@ Button["CLICK TO IDENTIFY",
          Alignment -> {Center, Center}];
        
        If[
-        (*no face detected*)
+        (* no face detected *)
         num == 0, (Print[
           Panel[Row[{tOUTPUT, "\t", 
              "PC: Recognition unsuccessful. Please try again."}]]];
@@ -228,35 +230,37 @@ Button["CLICK TO IDENTIFY",
           Extract[Position[#, Max[#]] &[beauty[[;; , 1, 3]]], {1, 1}]];
         RESspeech = 
          StringJoin[
-          Append[Riffle[
+          Append[
+           Riffle[
             Prepend[
              Reverse[
               StringCases[SPEECHtoTEXT, 
-                WordCharacter ..] \[Intersection] ({"the", "more", 
-                  "most", "of", "all"} \[Union] 
+                WordCharacter ..] \[Intersection] ({"the", "more", "most", "of", "all"} \[Union] 
                  StringCases[
-                  SPEECHtoTEXT, ("cut" | "beau" | "hand" | "gorg" | 
-                    "fine" | "bet" | "goo" | "look") ~~ 
+                  SPEECHtoTEXT, ("cut" | "beau" | "hand" | "gorg" | "fine" | "bet" | "goo" | "look") ~~ 
                    LetterCharacter ..])], 
              APIinitfull <> " Person " <> RES <> ", is"], " "], 
            "."]];
         
         If[
-         (*command understood& at least 1 face detected*)
+        
+         (* command understood& at least 1 face detected *)
          num >= 1 && 
           APIparam == "verb", (Print[
            Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinit}]]]; 
           Print[IDoutput]; Speak[APIinit]),
          
          If[
-          (*command contains a pronoun*)
+         
+          (* command contains a pronoun *)
           num >= 1 && 
            APIparam == "pronoun", (Print[
             Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinitfull}]]]; 
            Print[IDoutput]; Speak[APIinitfull]),
           
           If[
-           (*command contains an adjective*)
+          
+           (* command contains an adjective *)
            num >= 1 && (APIparam == "adjective (comparative)" || 
               APIparam == "adjective (superlative)"), (Print[
              Panel[Row[{tOUTPUT, "\t", "PC: ", RESspeech}]]]; 
@@ -265,7 +269,7 @@ Button["CLICK TO IDENTIFY",
              Panel[Row[{tOUTPUT, "\t", "PC: " <> APIinit}]]]; 
             Speak[APIinit])]]]]),
       
-      (*if false*)
+      (* if false *)
       (
        tFAIL = time[];
        Print[
