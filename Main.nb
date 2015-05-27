@@ -10,8 +10,10 @@ Button["CLICK TO IDENTIFY",
   tREC = time[];
   
   If[
+  
     (* condition 1:voice recording cancelled or aborted *)
     REC === $Canceled || REC === $Aborted,
+   
     (* if true *)
     (Print[
       Panel[Row[{tREC, "\t", "PC: ", 
