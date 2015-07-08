@@ -74,10 +74,11 @@ Button["CLICK TO IDENTIFY",
             If[tIN == 1, ProgressIndicator[Appearance -> "Percolate"],
               ""]]}]]];
        Speak["Initialising recognition engine. Please wait."];
+       
        Clear[img];
-       IMAQ`StartCamera[]; Pause[0.5];
+       DeviceOpen["Camera"]; Pause[0.5];
        img = CurrentImage[];
-       IMAQ`StopCamera[];
+       DeviceClose["Camera"]
        
        (* convert photo to Base 64 *)
        base64 = ExportString[ExportString[img, "JPEG"], "Base64"];
