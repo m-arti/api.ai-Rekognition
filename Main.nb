@@ -140,10 +140,9 @@ Button["CLICK TO IDENTIFY",
        beauty = 
         Table[Row[Riffle[R[[3, 2, person, 38]], " : "]], {person, 
           Range[num]}];
-       emotion = 
-        Table[(Column@{"emotion:\n", 
-            Grid[R[[3, 2, person, 32, 2]], 
-             Alignment -> Left]}), {person, Range[num]}];
+       emotion = Table[(Column@{"emotion:\n", 
+        Grid[Reverse@SortBy[R[[3, 2, person, 32, 2]], Last], 
+         Alignment -> Left]}), {person, Range[num]}];
        
        (* user attributes *)
        age = Table[R[[3, 2, person, 33]], {person, Range[num]}];
