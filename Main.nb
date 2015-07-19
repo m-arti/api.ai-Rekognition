@@ -142,7 +142,7 @@ Button["CLICK TO IDENTIFY",
           Range[num]}];
        emotion = Table[(Column@{"emotion:\n", 
         Grid[Reverse@SortBy[R[[3, 2, person, 32, 2]], Last], 
-         Alignment -> Left]}), {person, Range[num]}];
+         Alignment -> Left]}), {person, Range[num]}]; 
        
        (* user attributes *)
        age = Table[R[[3, 2, person, 33]], {person, Range[num]}];
