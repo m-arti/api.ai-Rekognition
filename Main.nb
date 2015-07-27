@@ -203,10 +203,9 @@ Button["CLICK TO IDENTIFY",
                 Alignment -> Center, ImageMargins -> 10]}, 
               Alignment -> Center, Dividers -> Center, 
               FrameStyle -> GrayLevel[0.8]]], 
-            Style[Grid[{Column[{Row@
-                    Riffle[{"Person " <> ToString@#}, "\t"], 
-                   Row[Riffle[{age[[#]], gender[[#]], race[[#]]}, 
-                    " | "]], Row[{smile[[#]], " | ", beauty[[#]]}], 
+            Style[Grid[{Column[{
+                   "Person " <> ToString@#, 
+                   Row[Riffle[{age[[#]], gender[[#]], race[[#]]}," | "]], Row[{smile[[#]], " | ", beauty[[#]]}], 
                    emotion[[#]], 
                    Row[{glasses[[#]], " / ", sunglasses[[#]]}], 
                    eyesclosed[[#]], mouthopenwide[[#]]}, 
