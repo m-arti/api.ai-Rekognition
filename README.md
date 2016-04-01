@@ -12,4 +12,4 @@ Through the combination of both API's, this project aims to create a [Mathematic
 [api.ai]: http://api.ai/
 [Rekognition]: https://rekognition.com/
 [Mathematica]: http://www.wolfram.com/mathematica/
-[Here's]: http://aeroexplora.org/2015/03/08/api-ai-rekognition/
+[Here's]: http://www.aeroexplora.com/blog/2015/03/08/api-ai-rekognition
